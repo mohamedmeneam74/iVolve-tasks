@@ -1,0 +1,76 @@
+# Calculator Gradle App
+
+A simple calculator application built and packaged with **Gradle**, on **RHEL**.
+
+Source code: https://github.com/Ibrahim-Adel15/CalculatorGradleApp.git
+
+## Prerequisites
+
+- **Java 17** (JDK)
+- **Gradle**
+- **Git**
+
+## Setup
+
+### 1. Install Java 17
+
+```bash
+sudo dnf install -y java-17-openjdk java-17-openjdk-devel
+java -version
+```
+
+### 2. Install Gradle
+
+Gradle is not available in the default RHEL repositories, so it is installed manually from the official distribution:
+
+```bash
+sudo dnf install -y wget unzip git
+wget https://services.gradle.org/distributions/gradle-8.10.2-bin.zip -P /tmp
+sudo unzip -d /opt/gradle /tmp/gradle-8.10.2-bin.zip
+```
+
+Add Gradle to the PATH:
+
+```bash
+echo 'export PATH=$PATH:/opt/gradle/gradle-8.10.2/bin' | sudo tee /etc/profile.d/gradle.sh
+source /etc/profile.d/gradle.sh
+gradle -v
+```
+
+### 3. Clone the source code
+
+```bash
+git clone https://github.com/Ibrahim-Adel15/CalculatorGradleApp.git
+cd CalculatorGradleApp
+```
+
+## Run Unit Tests
+
+```bash
+gradle test
+```
+
+## Build the Application
+
+```bash
+gradle build
+```
+
+After a successful build, the artifact is generated at:
+
+```
+build/libs/calculator.jar
+```
+
+## Run the Application
+
+```bash
+java -jar build/libs/calculator.jar
+```
+
+## Verify the App Is Working
+
+If the application starts and prints its output / accepts input without errors, the app is working correctly.
+
+
+

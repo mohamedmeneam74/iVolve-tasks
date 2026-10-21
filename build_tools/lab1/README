@@ -1,0 +1,43 @@
+# Lab 1 — Build and Package a Java Application with Maven
+
+## Objective
+Build, test, package, and run the Calculator Java application using Maven.
+
+## Prerequisites
+- Java JDK (prefer Java 17)
+- Apache Maven
+- Git
+
+## Source code
+```bash
+git clone https://github.com/Ibrahim-Adel15/CalculatorMavenApp.git
+cd CalculatorMavenApp
+```
+
+## 1. Verify the tools
+```bash
+java -version
+javac -version
+mvn -version
+```
+
+## 2. Run unit tests
+```bash
+mvn test
+```
+Expected: Maven finishes with `BUILD SUCCESS`. If tests fail, read the first test failure in the output before proceeding.
+
+## 3. Package the application
+```bash
+mvn package
+```
+
+## 4. Run the application
+First inspect the JAR manifest and repository instructions if the JAR does not run:
+```bash
+java -jar target/calculator.jar
+```
+## 5. Verify
+Use the application's prompts and enter sample values. Confirm the calculator returns the expected result. Record the commands, test result, and artifact name.
+
+
