@@ -1,0 +1,114 @@
+# Lab 3: Docker image for a Java app
+
+In this lab I made a Docker image for the Calculator Maven app in two ways:
+
+1. Build the app inside Docker (app1)
+2. Build the app on my machine, then copy the jar into the image (app2)
+
+App source: https://github.com/Ibrahim-Adel15/CalculatorMavenApp.git
+
+## Requirements
+
+- Docker
+- Git
+- Java 17 and Maven (only needed for Part 2)
+
+## Clone the code
+
+```bash
+git clone https://github.com/Ibrahim-Adel15/CalculatorMavenApp.git
+cd CalculatorMavenApp
+```
+
+## Part 1: Build inside Docker
+
+### Dockerfile
+
+```dockerfile
+FROM maven:3.9-eclipse-temurin-17
+
+# working directory and non-root user
+WORKDIR /app
+
+COPY . .
+
+# build the app
+RUN mvn package
+
+EXPOSE 8080
+
+CMD ["java", "-jar", "target/calculator.jar"]
+```
+
+### Build the image
+
+```bash
+docker build -t app1 .
+docker images app1
+```
+
+Size of app1: **<263Mb>**
+
+### Run the container and verify
+
+```bash
+docker run -d --name container1 -p 8080:8080 app1
+
+
+
+## Part 2: Build locally
+
+### Build with Maven
+
+```bash
+mvn package
+ls target/
+```
+
+The jar should be in `target/calculator.jar`.
+
+### Dockerfile
+
+```dockerfile
+FROM alpine/java:17 
+
+
+# copy the jar that I built locally
+COPY target/calculator.jar app.jar
+
+
+EXPOSE 8080
+
+CMD ["java", "-jar", "app2.jar"]
+```
+
+### Build the image
+
+```bash
+docker build -t app2 -f Dockerfile.2 .
+docker images app2
+```
+
+Size of app2: **162Mb**
+
+### Run the container and verify
+
+```bash
+docker run -d --name container2 -p 8082:8080 app2
+
+
+## Bonus: Comparing the sizes
+
+| Image | Approach | Size |
+|-------|----------|------|
+| app1 | Build inside Docker | 263Mb |
+| app2 | Build locally | 162Mb |
+
+app1 is a lot bigger than app2.
+
+- In app1 the image has everything that was used to build the app: Maven, the full JDK, the source code, and the downloaded dependencies (the `.m2` folder). None of that is needed to just run the app.
+- In app2 the image only has a Java 17 runtime (JRE) and the jar file, so it is much smaller.
+
+The downside of app2 is that I need Java and Maven installed on my machine to build the jar first, so the build depends on my environment. With app1 anyone with Docker can build the image and get the same result.
+
+

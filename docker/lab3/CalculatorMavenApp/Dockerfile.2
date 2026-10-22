@@ -1,0 +1,5 @@
+FROM alpine/java:17 
+WORKDIR /app2 
+COPY /target/calculator.jar app2.jar
+EXPOSE 8080 
+CMD ["java", "-jar", "app2.jar"]

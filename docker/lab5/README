@@ -1,0 +1,134 @@
+# Lab 5: Docker image vulnerability scanning with Trivy
+
+In this lab I built an image, scanned it with Trivy, made an HTML report, and then fixed the vulnerabilities (bonus) and scanned again.
+
+App source: https://github.com/Ibrahim-Adel15/TrivyImage.git
+
+## Clone the code
+
+```bash
+git clone https://github.com/Ibrahim-Adel15/TrivyImage.git
+cd TrivyImage
+```
+
+## Step 1: Build the image
+
+```bash
+docker build -t trivy-lab:v1 .
+docker images trivy-lab
+```
+
+## Step 2: Install Trivy (RHEL 10)
+
+```bash
+sudo rpm -ivh https://github.com/aquasecurity/trivy/releases/download/v0.76.0/trivy_0.76.0_Linux-64bit.rpm
+trivy --version
+```
+
+If I had added the repo file before, I removed it first because it breaks `dnf`:
+
+```bash
+sudo rm -f /etc/yum.repos.d/trivy.repo
+sudo dnf clean all
+```
+
+## Step 3: Scan the image
+
+```bash
+trivy image trivy-lab:v1
+```
+
+## Step 4: Scan for HIGH and CRITICAL only
+
+```bash
+trivy image --severity HIGH,CRITICAL trivy-lab:v1
+```
+
+## Step 5: Generate an HTML report
+
+Trivy needs the html template, so I downloaded it first:
+
+```bash
+wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
+trivy image --format template --template "@html.tpl" -o report-v1.html trivy-lab:v1
+```
+
+To open the report I opened it with:
+
+```bash
+firefox report-v1.html
+```
+
+### What I found in the report (v1)
+
+The image had a total of **222 CRITICAL** and **2133 HIGH** vulnerabilities. They come from two places:
+
+| Source | What it is | Notes |
+|--------|-----------|-------|
+| OS packages (Debian 11) | The base image is an old, full Debian image | About 2330 findings. Lots of extra packages the app doesn't need (ImageMagick, `libpq-dev`, `linux-libc-dev`, Python 3.9, curl, git...). ImageMagick causes most of the CRITICAL ones. |
+| Node packages | App dependencies and the npm tool inside the base image | 1 CRITICAL and 26 HIGH. For example `body-parser` and `path-to-regexp` (old Express), and `tar`, `minimatch`, `brace-expansion`, `glob` (inside npm). |
+
+About half of the HIGH/CRITICAL findings already have a fixed version available.
+
+## Bonus: Fix the vulnerabilities
+
+### 1. Investigate
+
+From the report I saw that the biggest problem is the old and big base image, and then the old Node dependencies.
+
+### 2. Update the base image
+
+In the Dockerfile I changed the `FROM` line to a newer and smaller image:
+
+```dockerfile
+
+FROM node:22-alpine
+```
+
+A newer base image removes most of the OS vulnerabilities, and it also comes with a newer npm, which fixes `tar`, `minimatch` and the other npm packages.
+
+### 3. Update the app dependencies
+
+`npm` is not installed on my RHEL machine, so I ran it inside a Node container from the project folder:
+
+```bash
+docker run --rm -u $(id -u):$(id -g) -e HOME=/tmp \
+  -v "$PWD":/app:Z -w /app node:22-alpine \
+  sh -c "npm install express@latest && npm audit fix"
+```
+
+This updates `package.json` and `package-lock.json` (Express, `body-parser`, `path-to-regexp`).
+
+### 4. Dockerfile after the fix
+
+```dockerfile
+FROM node:22-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --omit=dev
+COPY app.js ./
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+### 5. Rebuild as ivolve-app:v2
+
+```bash
+docker build -t ivolve-app:v2 .
+```
+
+### 6. Scan again and make a new report
+
+```bash
+trivy image --severity HIGH,CRITICAL --ignore-unfixed ivolve-app:v2
+trivy image --severity HIGH,CRITICAL --ignore-unfixed --format template --template "@html.tpl" -o report-v2.html ivolve-app:v2
+```
+
+## Results
+
+| Image | HIGH | CRITICAL |
+|-------|------|----------|
+| trivy-lab:v1 | 2133 | 222 |
+| ivolve-app:v2 | 14 | 0 |
+
+

@@ -1,0 +1,107 @@
+# Lab 6: Docker environment variables and resource management
+
+In this lab I containerized a Python app, passed environment variables in 3 different ways, and limited the container resources.
+
+App source: https://github.com/Ibrahim-Adel15/PythonApp.git
+
+## Clone the code
+
+```bash
+git clone https://github.com/Ibrahim-Adel15/PythonApp.git
+cd PythonApp
+```
+## ## Step 1: Create Dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 5000
+CMD ["python", "app.py"]
+
+
+## Step 2: Build the image
+
+```bash
+docker build -t ivolve1 .
+```
+
+## Step 3: Run container1 with env variables and limits
+
+```bash
+docker run -d --name container1 -p 5000:5000 \
+  -e APP_NAME=iVolveApp1 -e APP_ENV=stg \
+  --cpus=1 --memory=256m \
+  ivolve1
+```
+
+## Step 4: Verify the app
+
+```bash
+curl http://localhost:5000
+```
+
+## Step 5: Verify the environment variables inside the container
+
+```bash
+docker exec container1 env | grep APP_
+```
+
+## Step 6: Check the resource usage
+
+```bash
+docker stats container1
+```
+doc
+To confirm the limits are applied:
+
+```bash
+docker inspect container
+```
+
+## Step 7: Use an env file
+
+Create `env.txt`:
+
+```
+APP_NAME=iVolveApp2
+APP_ENV=prod
+```
+
+Port 5000 is already used by container1, so I removed it first:
+
+```bash
+docker rm -f container1
+
+docker run -d --name container2 -p 5000:5000 --env-file env.txt ivolve1
+docker inspect container2
+```
+
+## Step 8: Hardcode the variables in the Dockerfile
+
+
+```dockerfile
+ENV APP_NAME=iVolveApp3
+ENV APP_ENV=dev
+```
+
+Build a new image:
+
+```bash
+docker build -t ivolve2 .
+```
+
+Remove container2 and run it again from the new image:
+
+```bash
+docker rm -f container2
+
+docker run -d --name container2 -p 5000:5000 ivolve2
+curl http://localhost:5000
+docker inspect container2 
+```
+
+The output should show `APP_NAME=iVolveApp3` and `APP_ENV=dev`.
+
+
+

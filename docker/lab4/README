@@ -1,0 +1,109 @@
+# Lab 4: Docker image optimization and export/load
+
+In this lab I built an image from the existing Dockerfile (image1), then wrote a multi-stage Dockerfile that runs as a non-root user (image2), compared the sizes, and then saved/loaded image2 as a tar file.
+
+App source: https://github.com/Ibrahim-Adel15/ImageOptimization-.git
+
+## Clone the code
+
+```bash
+git clone https://github.com/Ibrahim-Adel15/ImageOptimization-.git
+cd ImageOptimization-
+```
+
+## Step 1: Build image1 from the existing Dockerfile
+
+```bash
+docker build -t image1 .
+docker images image1
+```
+
+Size of image1: **<write the size here>**
+
+## Step 2: Run container1 and verify
+
+```bash
+docker run -d --name container1 -p 8080:8080 image1
+docker ps
+docker logs container1
+```
+
+
+Then stop and delete it:
+
+```bash
+docker stop container1
+docker rm container1
+```
+
+## Step 3: Multi-stage Dockerfile with a non-root user
+
+I replaced the Dockerfile with a multi-stage one. The first stage builds the app and the second stage only has what is needed to run it.
+
+```dockerfile
+# stage 1: build
+FROM maven:3.9.15-eclipse-temurin-17-alpine AS build
+WORKDIR /app
+COPY pom.xml . 
+COPY src ./src
+RUN mvn package
+
+# stage 2: run
+```
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+RUN useradd -m appuser
+COPY --from=build --chown=appuser:appuser /app/target/demo-0.0.1-SNAPSHOT.jar app.jar
+USER appuser
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]
+
+
+## Step 4: Build image2 and compare sizes
+
+```bash
+docker build -t image2 .
+docker images
+```
+
+| Image | Size |
+|-------|------|
+| image1 | 667 MB |
+| image2 | 461 MB |
+
+image2 is smaller because the final image doesn't have the build tools and the extra files that were only needed to build the app.
+
+## Step 5: Run container2 and check it is non-root
+
+```bash
+docker run -d --name container2 -p 8082:8080 image2
+docker logs container2
+docker exec container2 whoami
+```
+
+The output of `whoami` should be `appuser` (not `root`).
+
+Stop and delete it:
+
+```bash
+docker stop container2
+docker rm container2
+```
+
+## Step 6: Save image2 as a tar file
+
+```bash
+docker save -o lab-image.tar image2
+ls -lh lab-image.tar
+```
+
+## Step 7: Delete image2 and load it again
+
+```bash
+docker rmi image2
+docker images            # image2 is gone
+
+docker load -i lab-image.tar
+docker images            # image2 is back
+```
+
