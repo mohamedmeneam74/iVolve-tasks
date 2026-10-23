@@ -1,0 +1,68 @@
+Lab 8: Containerized Node.js and MySQL Stack Using Docker Compose
+1. Clone the application
+bash
+git clone https://github.com/Ibrahim-Adel15/iVolveApp.git
+cd iVolveApp
+
+The app needs a MySQL connection and a database named ivolve.
+
+2. docker-compose.yml
+yaml
+services:
+  app:
+    build: .
+    container_name: ivolve-app
+    ports:
+      - "3000:3000"
+    environment:                    
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: rootpass
+      DB_NAME: ivolve
+    volumes:
+      - app_logs:/app/logs
+    networks:
+      - ivolve-net
+   
+  db:
+    image: mysql:8
+    container_name: ivolve-db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: ivolve
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - ivolve-net
+    
+networks:
+  ivolve-net:
+    driver: bridge
+
+volumes:
+  app_logs:
+  db_data:
+3. Start and verify
+bash
+docker compose up -d --build
+docker compose ps
+docker compose logs -f app
+
+Check the DB connection and database:
+
+bash
+docker exec -it ivolve-db mysql -uroot -prootpass -e "SHOW DATABASES;"
+
+Open http://localhost:3000 and test the app.
+
+Check persistence:
+
+bash
+docker compose down        # keeps volumes
+docker compose up -d
+docker volume ls
+4. Build, tag and push to Docker Hub
+bash
+docker login
+docker build -t medomeneam/ivolve-app:v1 .
+docker push medomeneam/ivolve-app:v1
