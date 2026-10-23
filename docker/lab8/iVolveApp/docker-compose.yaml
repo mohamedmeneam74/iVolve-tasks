@@ -1,0 +1,34 @@
+services:
+  app:
+    build: .
+    container_name: ivolve-app
+    ports:
+      - "3000:3000"
+    environment:                    
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: rootpass
+      DB_NAME: ivolve
+    volumes:
+      - app_logs:/app/logs
+    networks:
+      - ivolve-net
+
+  db:
+    image: mysql:8
+    container_name: ivolve-db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: ivolve
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - ivolve-net
+
+networks:
+  ivolve-net:
+    driver: bridge
+
+volumes:
+  app_logs:
+  db_data:
