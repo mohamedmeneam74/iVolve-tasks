@@ -1,0 +1,46 @@
+Lab 11: Namespace Management and Resource Quota Enforcement
+1. Create the namespace
+bash
+kubectl create namespace ivolve
+kubectl get namespaces
+2. Create the ResourceQuota (max 3 pods)
+
+Imperative:
+bash
+kubectl create quota ivolvequota --hard=pods=3 -n ivolve -o yaml > quota.yml
+
+quota.yml:
+yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ivolvequota
+  namespace: ivolve
+spec:
+  hard:
+    pods: "3"
+
+3. Verify the quota
+bash
+kubectl get resourcequota -n ivolve
+kubectl describe resourcequota ivolvequota -n ivolve
+# Resource  Used  Hard
+# pods      0     3
+4. Confirm Kubernetes blocks extra pods
+
+Create 3 pods, then a 4th:
+
+bash
+kubectl run pod1 --image=nginx -n ivolve
+kubectl run pod2 --image=nginx -n ivolve
+kubectl run pod3 --image=nginx -n ivolve
+
+kubectl run pod4 --image=nginx -n ivolve
+# Error from server (Forbidden): pods "pod4" is forbidden:
+# exceeded quota: ivolvequota, requested: pods=1, used: pods=3, limited: pods=3
+
+Check usage again:
+
+bash
+kubectl describe resourcequota ivolvequota -n ivolve    # pods 3/3
+kubectl get pods -n ivolve

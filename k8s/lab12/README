@@ -1,0 +1,51 @@
+Lab 12: Managing Configuration and Sensitive Data with ConfigMaps and Secrets
+
+
+1. ConfigMap ivolvecm (non-sensitive config)
+bash 
+kubectl create configmap ivolvecm --from-literal=DB_USER=ivolve-user --from-literal=DB_HOST=db --dry-run=client -o yaml  > configmap.yml
+
+configmap.yml:
+yaml
+apiVersion: v1
+data:
+  DB_HOST: db
+  DB_USER: ivolve-user
+kind: ConfigMap
+metadata:
+  name: ivolvecm
+      
+bash
+kubectl apply -f configmap.yml
+
+
+2. Secret ivolvesecret (sensitive credentials, Base64-encoded)
+
+Encode the values first. Use -n, otherwise a newline becomes part of the password:
+
+bash
+echo -n 'RootPass@123' | base64      # Um9vdFBhc3NAMTIz
+echo -n 'UserPass@123' | base64      # VXNlclBhc3NAMTIz
+Then create Secrets 
+secerts.yml:
+yaml
+
+apiVersion: v1
+data:
+  DB_PASSWORD: YVhadmJIWmxMWFZ6WlhJSw==
+  MYSQL_ROOT_PASSWORD: YVhadmJIWmxNVEl6Q2c9PQ==
+kind: Secret
+metadata:
+  name: ivolvesecret
+
+bash
+kubectl apply -f secerts.yml
+3. Verify
+bash
+kubectl get configmap ivolvecm -n ivolve -o yaml
+kubectl describe configmap ivolvecm -n ivolve
+
+kubectl get secret ivolvesecret -n ivolve
+kubectl describe secret ivolvesecret -n ivolve        # shows sizes only, not values
+
+

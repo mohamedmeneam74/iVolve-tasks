@@ -1,0 +1,42 @@
+Lab 10: Node Isolation Using Taints and Labels
+
+1. Apply the taint (key workload, value ivolveApp, effect NoSchedule)
+bash
+kubectl taint nodes worker1 workload=ivolveApp:NoSchedule
+
+Pods will not be scheduled on this node unless they have a matching toleration.
+
+2. Label the same node
+bash
+kubectl label nodes worker1 project=ivolve
+3. Verify
+bash
+kubectl describe node worker1 | grep -i taints
+# Taints:  workload=ivolveApp:NoSchedule
+
+kubectl get nodes --show-labels
+# worker1 ... project=ivolve
+
+kubectl describe node worker1      # full view: Labels and Taints sections
+
+#####
+A pod that is allowed on this node (label will be matched with node's label and toleration will be matched with node's taint)
+yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ivolve-pod
+spec:
+  nodeSelector:
+    project: ivolve
+  tolerations:
+    - key: "workload"
+      operator: "Equal"
+      value: "ivolveApp"
+      effect: "NoSchedule"
+  containers:
+    - name: nginx
+      image: nginx
+bash
+kubectl apply -f ivolve-pod.yml
+kubectl get pod ivolve-pod -o wide    # should run on worker1

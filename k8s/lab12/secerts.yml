@@ -1,0 +1,7 @@
+apiVersion: v1
+data:
+  DB_PASSWORD: YVhadmJIWmxMWFZ6WlhJSw==
+  MYSQL_ROOT_PASSWORD: YVhadmJIWmxNVEl6Q2c9PQ==
+kind: Secret
+metadata:
+  name: ivolvesecret
