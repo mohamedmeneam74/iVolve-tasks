@@ -1,0 +1,65 @@
+Lab 13: Persistent Storage Setup for Application Logging
+1. Prepare the directory on the worker node
+
+hostPath uses the node's file system, so the directory must exist on the worker that will run the pods (not on the control plane):
+
+bash
+# on worker1
+sudo mkdir -p /mnt/app-logs
+sudo chmod 777 /mnt/app-logs        # lab only: lets any container user write
+2. PersistentVolume ivolvepv
+
+ivolvepv.yaml:
+
+yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ivolvepv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""            # no StorageClass
+  hostPath:
+    path: /mnt/app-logs
+    type: DirectoryOrCreate
+bash
+kubectl apply -f ivolvepv.yaml
+
+A PV is cluster-scoped, so it has no namespace.
+
+3. PersistentVolumeClaim ivolvepvc
+
+ivolvepvc.yaml:
+
+yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ivolvepvc
+  namespace: ivolve               # CHECK: the namespace where the app pods will run
+spec:
+  accessModes:
+    - ReadWriteMany               # must match the PV
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: ""            # empty string = do not use any StorageClass (not even the default)
+  volumeName: ivolvepv            # optional: bind explicitly to this PV
+bash
+kubectl apply -f ivolvepvc.yaml
+
+Setting storageClassName: "" on both objects is what keeps the cluster from using a default StorageClass.
+
+4. Verify
+bash
+kubectl get pv
+kubectl get pvc -n ivolve
+# ivolvepv   1Gi   RWX   Retain   Bound   ivolve/ivolvepvc
+# ivolvepvc  Bound  ivolvepv  1Gi  RWX
+
+kubectl describe pv ivolvepv
+kubectl describe pvc ivolvepvc -n ivolve
