@@ -1,0 +1,179 @@
+Lab 14: StatefulSet with Headless Service
+
+1. Headless Service ivolvedbsvc
+
+ivolvedbsvc.yaml:
+
+yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ivolvedbsvc
+  namespace: ivolve
+spec:
+  clusterIP: None                 # headless
+  selector:
+    app: ivolvedb
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306
+bash
+kubectl apply -f ivolvedbsvc.yaml
+2. Storage for MySQL data
+
+The StatefulSet creates its own PVC from a template. On a kubeadm cluster there is no dynamic provisioner, so you need a PV for it to bind to. The Lab 13 PV (ivolvepv) is already bound to ivolvepvc (a PV binds to one claim only), so create a second PV for the database:
+
+bash
+# on worker1
+sudo mkdir -p /mnt/mysql-data
+
+ivolvedb-pv.yaml:
+
+yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ivolvedb-pv
+  labels:
+    app: ivolvedb
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /mnt/mysql-data
+    type: DirectoryOrCreate
+bash
+kubectl apply -f ivolvedb-pv.yaml
+
+
+3. StatefulSet ivolvedb
+
+The MySQL image reads MYSQL_ROOT_PASSWORD, MYSQL_USER, MYSQL_PASSWORD and MYSQL_DATABASE. The ConfigMap/Secret keys from Lab 12 are DB_USER and DB_PASSWORD, which MySQL does not understand by themselves, so they are mapped to the right names below. MYSQL_ROOT_PASSWORD already matches, so it is read straight from the Secret.
+
+ivolvedb.yaml:
+
+yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ivolvedb
+  namespace: ivolve
+spec:
+  serviceName: ivolvedbsvc        # the headless Service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ivolvedb
+  template:
+    metadata:
+      labels:
+        app: ivolvedb
+    spec:
+      nodeSelector:
+        project: ivolve
+      tolerations:
+        - key: "workload"
+          operator: "Equal"
+          value: "ivolveApp"
+          effect: "NoSchedule"
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+              name: mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ivolvesecret
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: ivolvecm
+                  key: DB_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ivolvesecret
+                  key: DB_PASSWORD
+            - name: MYSQL_DATABASE
+              value: ivolve
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: ""
+        selector:
+          matchLabels:
+            app: ivolvedb
+        resources:
+          requests:
+            storage: 1Gi
+bash
+kubectl apply -f ivolvedb.yaml
+kubectl get pods -n ivolve -w
+
+Wait until ivolvedb-0 is 1/1 Running (MySQL can take 30-60 seconds to initialize).
+
+4. Verify the StatefulSet and storage
+bash
+kubectl get statefulset,pods,svc,pvc -n ivolve -o wide
+# ivolvedb-0 should be on worker1
+# PVC data-ivolvedb-0 should be Bound to ivolvedb-pv
+
+kubectl describe pod ivolvedb-0 -n ivolve | grep -iE "node:|tolerations|node-selectors"
+kubectl logs ivolvedb-0 -n ivolve | tail
+5. Confirm the database is operational (MySQL client)
+bash
+kubectl exec -it ivolvedb-0 -n ivolve -- mysql -uroot -p
+
+Inside MySQL:
+
+sql
+SHOW DATABASES;          -- ivolve must be listed
+SELECT User, Host FROM mysql.user;   -- the DB_USER user must be listed
+EXIT;
+
+Test the application user too:
+
+bash
+kubectl exec -it ivolvedb-0 -n ivolve -- mysql -u<DB_USER> -p ivolve   
+
+6. Verify DNS resolution inside the cluster
+
+The worker is tainted, and the control plane has its own taint, so a test pod needs the toleration to be scheduled. Use a small pod (this stays within the 3-pod quota):
+
+dns-test.yaml:
+
+yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dns-test
+  namespace: ivolve
+spec:
+  nodeSelector:
+    project: ivolve
+  tolerations:
+    - key: "workload"
+      operator: "Equal"
+      value: "ivolveApp"
+      effect: "NoSchedule"
+  containers:
+    - name: busybox
+      image: busybox:1.28
+      command: ["sleep", "3600"]
+bash
+kubectl apply -f dns-test.yaml
+kubectl exec -it dns-test -n ivolve -- nslookup ivolvedbsvc
