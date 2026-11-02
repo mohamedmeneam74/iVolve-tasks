@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ivolvenp
+  namespace: ivolve
+spec:
+  podSelector:
+    matchLabels:
+      app: ivolvedb             # the MySQL pod
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: ivolveapp    # only the application pods
+      ports:
+        - protocol: TCP
+          port: 3306
