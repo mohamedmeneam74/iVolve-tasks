@@ -1,0 +1,45 @@
+@Library('ivolve-lib') _
+
+pipeline {
+    agent { label 'docker-agent' }          // runs on the Jenkins agent (Part B)
+
+    environment {
+        IMAGE_NAME = 'medomeneam/demoapp'      // CHECK: your Docker Hub username
+        IMAGE_TAG  = "${env.BUILD_NUMBER}"
+        K8S_SERVER = 'https://192.168.228.129:6443'      // CHECK: control plane IP
+    }
+
+    stages {
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+        stage('Build App') {
+            steps { buildApp() }
+        }
+        stage('Build Image') {
+            steps {
+                buildImage(imageName: env.IMAGE_NAME,
+                           imageTag: env.IMAGE_TAG,
+                           credentialsId: 'dockerhub-credentials')
+            }
+        }
+        stage('Deploy on K8s') {
+            steps {
+                deployOnK8s(imageName: env.IMAGE_NAME,
+                            imageTag: env.IMAGE_TAG,
+                            deploymentFile: 'k8s/deployment.yaml',
+                            namespace: 'ivolve',
+                            server: env.K8S_SERVER,
+                            tokenCredId: 'k8s-token',
+                            caCredId: 'k8s-ca')
+            }
+        }
+    }
+
+    post {
+        always  { echo "Pipeline #${env.BUILD_NUMBER}: ${currentBuild.currentResult}"; deleteDir() }
+        success { echo 'Deployed successfully.' }
+        failure { echo 'Pipeline failed.' }
+    }
+}
+
