@@ -1,0 +1,111 @@
+# Lab 21 — Jenkins Pipeline for Application Deployment
+
+## Objective
+
+Build a Jenkins pipeline for the DemoApp that: builds the app, builds the Docker
+image, scans it, pushes it to DockerHub, deletes it locally, updates the image
+in the deployment file, and deploys it to Kubernetes — with `post` actions for
+`always`, `success` and `failure`.
+
+- App source: https://github.com/Ibrahim-Adel15/DemoApp.git
+- My DemoApp copy (with the pipeline): https://github.com/mohamedmeneam74/demoapp.git
+- Docker Hub image: `medomeneam/demoapp` (tag = Jenkins build number)
+
+DemoApp: Spring Boot 3.2, Java 17, Maven. One endpoint `/` returning
+`Hello from Dockerized Spring Boot!`, on port 8080.
+
+## Environment
+
+| Item | Value |
+|---|---|
+| Jenkins | Native install on the control plane, `http://192.168.228.129:8080` |
+| Control plane | `192.168.228.129` |
+| Worker node | `192.168.228.131` (must be running — the deployment schedules there, see below) |
+| Kubernetes namespace | `ivolve` |
+| Jenkins job | `demoapp-pipeline` (Pipeline script from SCM, Git, branch `*/main`, Script Path `Jenkinsfile`) |
+
+## What is in this folder
+
+| File | What it is |
+|---|---|
+| `demoapp/Jenkinsfile` | The pipeline (7 stages + `post`), at the repo root |
+| `demoapp/Dockerfile` | Runtime image for the app (see fix below) |
+| `demoapp/k8s/deployment.yaml` | Deployment `demoapp` in namespace `ivolve`, 1 replica, NodePort service target |
+| `demoapp/k8s/demoapp-svc.yaml` | Service `demoapp-svc`, NodePort `30080` |
+| `demoapp/pom.xml`, `demoapp/src/` | The DemoApp source |
+
+The Dockerfile copies `target/demo-0.0.1-SNAPSHOT.jar`, which is why the
+**Build App** stage (`mvn -B clean package`) must run before
+**Build Docker Image**.
+
+## Prerequisites (done before the first run)
+
+1. **Lab 19 RBAC is in place:** ServiceAccount `jenkinssa` in namespace
+   `ivolve`, Role `ivolvedeployrole` (deployments only), RoleBinding
+   `ivolvedeployrolebinding`, long-lived token Secret. The Role was widened
+   for this lab so the pipeline can also `get`, `list`, `watch` and `patch`
+   deployments (needed by `kubectl apply` and `rollout status`):
+   ```bash
+   kubectl patch role ivolvedeployrole -n ivolve --type=json \
+     -p='[{"op":"replace","path":"/rules/0/verbs","value":["get","list","watch","create","update","patch"]}]'
+   ```
+2. **Pod slot freed:** the Lab 11 quota allows only 3 pods in `ivolve`
+   (`ivolvedb-0` + 2 `ivolveapp` pods already used them), so `ivolveapp`
+   was scaled to 1 replica:
+   ```bash
+   kubectl scale deployment ivolveapp --replicas=1 -n ivolve
+   ```
+3. **Service created once as admin:** the Lab 19 Role can manage Deployments
+   only, not Services:
+   ```bash
+   kubectl apply -f k8s/demoapp-svc.yaml
+   ```
+
+## Jenkins credentials
+
+Manage Jenkins → Credentials → System → Global credentials:
+
+| ID | Kind | Value |
+|---|---|---|
+| `dockerhub-credentials` | Username with password | Docker Hub username `medomeneam` + a Docker Hub **access token** as password |
+| `k8s-token` | Secret text | The long-lived `jenkinssa` token from Lab 19 |
+| `k8s-ca` | Secret file | `ca.crt` from the control plane (`/etc/kubernetes/pki/ca.crt`) |
+
+> Tokens, passwords and `ca.crt` are stored in Jenkins only. They are never
+> committed to GitHub. The `Jenkinsfile` references them by ID only.
+
+## The pipeline stages
+
+1. **Build App** — `mvn -B clean package`
+2. **Build Docker Image** — `docker build -t $IMAGE_NAME:$IMAGE_TAG .`
+   (tag = build number, e.g. `medomeneam/demoapp:8`)
+3. **Scan Docker Image** — Trivy, `--severity HIGH,CRITICAL --exit-code 0`
+4. **Push Image to DockerHub** — `docker push` with `dockerhub-credentials`
+5. **Delete Image Locally** — `docker rmi $IMAGE_NAME:$IMAGE_TAG`
+6. **Update Image in Deployment File** — `sed` replaces the image in
+   `k8s/deployment.yaml` with `$IMAGE_NAME:$IMAGE_TAG`
+7. **Deploy to Kubernetes** — `kubectl apply -f k8s/deployment.yaml` +
+   `rollout status deployment/demoapp --timeout=180s`, authenticated with
+   `k8s-token` and `k8s-ca` (`--kubeconfig=/dev/null`,
+   `--server=https://192.168.228.129:6443`)
+
+`post`: `always` (docker logout, `deleteDir`), `success`, `failure`.
+
+## Validation
+
+```bash
+kubectl get deployment,pods -n ivolve -o wide
+kubectl describe deployment demoapp -n ivolve | grep Image
+# Image: medomeneam/demoapp:<build-number>
+
+docker images | grep demoapp
+# nothing on the build node — the pipeline deleted the image locally
+
+curl http://192.168.228.131:30080
+# Hello from Dockerized Spring Boot!
+```
+
+Result: pipeline **SUCCESS** (build #8). The new image tag exists on Docker
+Hub in `medomeneam/demoapp`, the deployment runs in namespace `ivolve`, and
+the app answers on NodePort `30080`.
+
