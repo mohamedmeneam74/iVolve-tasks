@@ -1,4 +1,3 @@
-cat >> .gitignore <<'EOF'
 target/
 build/
 .gradle/
@@ -7,5 +6,3 @@ build/
 *.tar.gz
 node_modules/
 .vault-pass
-EOF
-
