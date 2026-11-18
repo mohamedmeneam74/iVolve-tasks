@@ -1,0 +1,8 @@
+---
+- name: Lab 27 - MySQL with Ansible Vault
+  hosts: ivolve
+  become: true
+  vars_files:
+    - roles/mysql/vars/vault.yml
+  roles:
+    - mysql

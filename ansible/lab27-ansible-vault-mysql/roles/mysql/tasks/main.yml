@@ -1,0 +1,31 @@
+---
+- name: Install MariaDB server (MySQL-compatible - RHEL 10 repos have no mysql-server package)
+  ansible.builtin.dnf:
+    name: mariadb-server
+    state: present
+
+- name: Ensure MariaDB is running and enabled
+  ansible.builtin.systemd:
+    name: mariadb
+    state: started
+    enabled: true
+
+- name: Wait for MySQL to be ready
+  ansible.builtin.wait_for:
+    port: 3306
+    delay: 5
+    timeout: 60
+
+- name: Create ivolve database
+  ansible.builtin.shell: mysql -e "CREATE DATABASE IF NOT EXISTS {{ db_name }} CHARACTER SET utf8mb4;"
+  args:
+    executable: /bin/bash
+
+- name: Create ivolveuser with all privileges on ivolve DB
+  ansible.builtin.shell: >
+    mysql -e "CREATE USER IF NOT EXISTS '{{ db_user }}'@'%' IDENTIFIED BY '{{ db_password }}';
+    GRANT ALL PRIVILEGES ON {{ db_name }}.* TO '{{ db_user }}'@'%';
+    FLUSH PRIVILEGES;"
+  args:
+    executable: /bin/bash
+  no_log: true

@@ -1,6 +1,11 @@
+cat >> .gitignore <<'EOF'
 target/
 build/
 .gradle/
-*.tar
-report-v1.html
-*.tar
+*.jar
+*.class
+*.tar.gz
+node_modules/
+.vault-pass
+EOF
+

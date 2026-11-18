@@ -1,0 +1,59 @@
+---
+- name: Lab 25 - Install Docker, kubectl and Jenkins on managed node
+  hosts: ivolve
+  become: true
+  tasks:
+    - name: Add Docker CE repo (RHEL base repos have no docker package)
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/rhel/docker-ce.repo
+        dest: /etc/yum.repos.d/docker-ce.repo
+        mode: "0644"
+
+    - name: Install Docker
+      ansible.builtin.dnf:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+
+    - name: Ensure Docker service is running and enabled
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Install kubectl binary
+      ansible.builtin.get_url:
+        url: https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl
+        dest: /usr/local/bin/kubectl
+        mode: "0755"
+
+    - name: Install Java 17 for Jenkins
+      ansible.builtin.dnf:
+        name: java-17-openjdk
+        state: present
+
+    - name: Add Jenkins GPG key
+      ansible.builtin.get_url:
+        url: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+        dest: /etc/pki/rpm-gpg/jenkins.io-2023.key
+        mode: "0644"
+
+    - name: Add Jenkins repo
+      ansible.builtin.get_url:
+        url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+        dest: /etc/yum.repos.d/jenkins.repo
+        mode: "0644"
+
+    - name: Install Jenkins
+      ansible.builtin.dnf:
+        name: jenkins
+        state: present
+
+    - name: Ensure Jenkins service is running and enabled
+      ansible.builtin.systemd:
+        name: jenkins
+        state: started
+        enabled: true
+  

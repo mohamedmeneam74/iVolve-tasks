@@ -1,0 +1,28 @@
+---
+- name: Install Java 17 for Jenkins
+  ansible.builtin.dnf:
+    name: java-17-openjdk
+    state: present
+
+- name: Add Jenkins GPG key
+  ansible.builtin.get_url:
+    url: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+    dest: /etc/pki/rpm-gpg/jenkins.io-2023.key
+    mode: "0644"
+
+- name: Add Jenkins repo
+  ansible.builtin.get_url:
+    url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+    dest: /etc/yum.repos.d/jenkins.repo
+    mode: "0644"
+
+- name: Install Jenkins
+  ansible.builtin.dnf:
+    name: jenkins
+    state: present
+
+- name: Ensure Jenkins service is running and enabled
+  ansible.builtin.systemd:
+    name: jenkins
+    state: started
+    enabled: true

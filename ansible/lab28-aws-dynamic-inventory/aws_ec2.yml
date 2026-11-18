@@ -1,0 +1,18 @@
+# Lab 28 - AWS EC2 dynamic inventory
+# Plugin: amazon.aws.aws_ec2
+# Lists EC2 instances tagged server=ivolve and builds the inventory from AWS.
+# Needs AWS credentials (access key) - configure with `aws configure`
+# or ~/.aws/credentials. NEVER commit keys to Git and never paste them in chat.
+plugin: amazon.aws.aws_ec2
+regions:
+  - eu-central-1
+filters:
+  tag:server: ivolve
+keyed_groups:
+  - key: tags
+    prefix: tag
+hostnames:
+  - tag:Name
+  - private-ip-address
+compose:
+  ansible_host: public_ip_address | default(private_ip_address)

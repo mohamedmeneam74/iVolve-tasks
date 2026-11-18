@@ -1,0 +1,8 @@
+---
+- name: Lab 26 - Install tools with Ansible roles
+  hosts: ivolve
+  become: true
+  roles:
+    - docker
+    - kubectl
+    - jenkins
