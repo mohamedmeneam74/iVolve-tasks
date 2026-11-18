@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = '<dockerhub-username>/demoapp'      // CHECK: your Docker Hub username
+        IMAGE_NAME = 'medomeneam/demoapp'      
         IMAGE_TAG  = "${env.BUILD_NUMBER}"
-        K8S_SERVER = 'https://192.168.228.129:6443'      // CHECK: control plane IP
+        K8S_SERVER = 'https://192.168.228.129:6443'      
         NAMESPACE  = 'ivolve'
     }
 
@@ -24,7 +24,7 @@ pipeline {
         stage('Scan Docker Image') {
             steps {
                 // Reports HIGH/CRITICAL findings. Change --exit-code to 1 to fail the build on findings.
-                sh 'trivy image --no-progress --severity HIGH,CRITICAL --exit-code 0 $IMAGE_NAME:$IMAGE_TAG'
+            sh 'trivy image --no-progress --severity HIGH,CRITICAL --exit-code 0 --timeout 15m --skip-version-check --scanners vuln $IMAGE_NAME:$IMAGE_TAG'
             }
         }
 
